@@ -4,7 +4,7 @@
 ### Video demostrativo: https://share.vidyard.com/watch/g7UvzmtMweXCejqD49as2q? 
 - Clone o repositório : git clone https://github.com/gittiagohub/wk.git
 
-- Na pasta wk\Win32\Debug vai encontrar o arquivo config.ini e a dll(libmysql.dll) , Preencha os campos como nesse exemplo:
+- Na pasta wk\Win32\Debug vai encontrar o arquivo  config (config.ini) a dll(libmysql.dll) e o dump(dump-wk-202406091858.sql), Preencha os campos como nesse exemplo:
  Database=wk
  Server=localhost
  Port=3306
