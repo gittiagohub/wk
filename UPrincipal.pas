@@ -3,13 +3,14 @@ unit UPrincipal;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.Mask, Vcl.StdCtrls,
   Vcl.ExtCtrls, Vcl.DBCtrls, Data.DB, Vcl.Grids, Vcl.DBGrids,
   uiConnection,uiconfig, FireDAC.Stan.Intf, FireDAC.Stan.Option,
   FireDAC.Stan.Param, FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf,
   FireDAC.DApt.Intf, FireDAC.Comp.DataSet, FireDAC.Comp.Client, UClientAcess,
-  FireDAC.UI.Intf, FireDAC.VCLUI.Wait, FireDAC.Comp.UI, FireDAC.DApt;
+  FireDAC.UI.Intf, FireDAC.VCLUI.Wait, FireDAC.Comp.UI, FireDAC.DApt,
+  System.Classes;
 
 type
   TFormPrincipal = class(TForm)
@@ -52,6 +53,7 @@ type
     LabelDataEmissao: TLabel;
     FDMemTablePedidoItemauto_incremento: TIntegerField;
     ButtonApagarPedido: TButton;
+    ButtonNovoPedido: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure DBEditCodigoExit(Sender: TObject);
@@ -61,10 +63,9 @@ type
       Shift: TShiftState);
     procedure ButtonConsultarPedidoClick(Sender: TObject);
     procedure ButtonConsultarClienteClick(Sender: TObject);
-    procedure EditNumeroPedidoChange(Sender: TObject);
-    procedure DBEditCodClienteChange(Sender: TObject);
     procedure ButtonApagarPedidoClick(Sender: TObject);
-    procedure DBEditQuantidadeChange(Sender: TObject);
+    procedure DBEditCodClienteExit(Sender: TObject);
+    procedure ButtonNovoPedidoClick(Sender: TObject);
   private
     FClientAcess : TClientAcess;
     FAggregate   : TFDAggregate;
@@ -73,8 +74,9 @@ type
     procedure GravaPedido;
     procedure LimpaComponentesPedido;
     procedure CalculaTotalPedido;
-    procedure ConsultarPedido;
-    procedure ConsultarCliente;
+    procedure ConsultarPedido(ANumeroPedido : Integer = 0);
+    procedure ConsultarCliente(ACodCliente : String;
+                               ALimparClienteNaoEncontrado : Boolean = True);
     procedure ApagarPedido;
 
     function RecebeNumeroPedido : Integer;
@@ -89,7 +91,8 @@ var
 implementation
 
 uses
-  URetorno;
+  URetorno, UIPedidoItem, System.Generics.Collections, UIPedido, UPedido,
+  UPedidoItem;
 
 {$R *.dfm}
 
@@ -207,8 +210,17 @@ begin
 end;
 
 procedure TFormPrincipal.ButtonConsultarClienteClick(Sender: TObject);
+var
+  lCodClienteInput: String;
 begin
-     ConsultarCliente;
+     lCodClienteInput := InputBox('Entrada do Usuário',
+                                  'Digite o Código do Cliente',
+                                  '');
+
+     if not (lCodClienteInput.Trim.IsEmpty) then
+     begin
+          ConsultarCliente(lCodClienteInput,False);
+     end;
 end;
 
 procedure TFormPrincipal.ButtonConsultarPedidoClick(Sender: TObject);
@@ -219,6 +231,12 @@ end;
 procedure TFormPrincipal.ButtonGravarPedidoClick(Sender: TObject);
 begin
      GravaPedido;
+end;
+
+procedure TFormPrincipal.ButtonNovoPedidoClick(Sender: TObject);
+begin
+     LimpaComponentesPedido;
+     CalculaTotalPedido;
 end;
 
 procedure TFormPrincipal.CalculaTotalPedido;
@@ -236,99 +254,139 @@ begin
      LabelVLTotal.Caption := LTotal;
 end;
 
-procedure TFormPrincipal.ConsultarCliente;
-var lCodClienteInput : string;
-    lCodCliente : Integer;
-    lResult : TRetorno;
+procedure TFormPrincipal.ConsultarCliente(ACodCliente : String;
+                                          ALimparClienteNaoEncontrado : Boolean);
+var lCodCliente : Integer;
+    lResult : TRetornoCliente;
 begin
-     lCodClienteInput := InputBox('Entrada do Usuário',
-                                  'Digite o Código do Cliente',
-                                  '');
-                                    
-     if lCodClienteInput.Trim.IsEmpty then
+     if ACodCliente.Trim.IsEmpty then
      begin
-          Showmessage('Código do Cliente Não Pode Ser Vazio.');
+          DBEditCliente.Text    := '';
+          DBEditCodCliente.Text := '';
           Exit;
      end;
                                     
      try
-        lCodCliente := StrToInt(lCodClienteInput);
+        lCodCliente := StrToInt(ACodCliente);
      except on E: Exception do
           begin
-               Showmessage('Número do Pedido Inválido.');
+               Showmessage('Código do Cliente Inválido.');
                Exit;
           end;
      end;
 
-     lResult := FClientAcess.BuscaCliente(lCodCliente,
-                                          DBEditCodCliente,
-                                          DBEditCliente);
+     lResult := FClientAcess.BuscaCliente(lCodCliente);
 
-     if not(lResult.OK) then
-     begin
-          ShowMessage(lResult.Mensagem);
-          DBEditCliente.Text    := '';
-          DBEditCodCliente.Text := '';
-     end;
-     ButtonConsultarCliente.Visible := Trim(DBEditCodCliente.Text).IsEmpty;
+      with lResult do
+      begin
+           if not(Retorno.OK) then
+           begin
+                ShowMessage(Retorno.Mensagem);
+
+                if ALimparClienteNaoEncontrado then
+                begin
+                     DBEditCliente.Text    := '';
+                     DBEditCodCliente.Text := '';
+                end;
+           end
+           else
+           begin
+                DBEditCodCliente.Text := Cliente.Codigo.ToString;
+                DBEditCliente.Text    := Cliente.Nome;
+           end;
+      end;
 end;
 
-procedure TFormPrincipal.ConsultarPedido;
+procedure TFormPrincipal.ConsultarPedido(ANumeroPedido : Integer);
 var
   lNumeroPedido: Integer;
-  lResult : TRetorno;
+  lResult : TRetornoPedido;
+  lListPedidoItem : TList<IPedidoItem>;
+  lPedidoitem : IPedidoItem;
 begin
-     lNumeroPedido := RecebeNumeroPedido;
+     if ANumeroPedido = 0  then
+     begin
+          lNumeroPedido := RecebeNumeroPedido;
+     end
+     else
+     begin
+          lNumeroPedido := ANumeroPedido;
+     end;
 
      if lNumeroPedido = 0 then
      begin
           Exit
      end;
 
-     lResult := FClientAcess.BuscaPedido(lNumeroPedido,
-                                         EditNumeroPedido,
-                                         EditDataEmissao,
-                                         DBEditCodCliente,
-                                         DBEditCliente,
-                                         LabelVLTotal,
-                                         FDMemTablePedidoItem);
+     lResult := FClientAcess.BuscaPedido(lNumeroPedido);
 
-     if not(lResult.OK) then
+     with lResult do
      begin
-          ShowMessage(lResult.Mensagem);
+          if not(Retorno.OK) then
+          begin
+               ShowMessage(Retorno.Mensagem);
+          end
+          else
+          begin
+               EditNumeroPedido.Text   := Pedido.NumeroPedido.ToString;
+               DBEditCodCliente.Text   := Pedido.GetCodCliente.ToString;
+               DBEditCliente.Text      := Pedido.GetCliente;
+               EditDataEmissao.Text    := DateToStr(Pedido.DataEmissao);
+               LabelVLTotal.Caption    := FloatToStr(Pedido.GetValorTotal);
+
+               lListPedidoItem := Pedido.GetListaItens();
+               FDMemTablePedidoItem.EmptyDataSet;
+
+               for LPedidoitem in lListPedidoitem do
+               begin
+                    with FDMemTablePedidoItem do
+                    begin
+                         Append;
+                         FieldByName('codigo_produto').AsInteger  := LPedidoitem.CodigoProduto;
+                         FieldByName('descricao').AsString        := LPedidoitem.Descricao;
+                         FieldByName('quantidade').AsFloat        := LPedidoitem.Quantidade;
+                         FieldByName('vl_unitario').AsCurrency    := LPedidoitem.VlUnitario;
+                         FieldByName('vl_total').AsCurrency       := LPedidoitem.VlTotal;
+                         FieldByName('auto_incremento').AsInteger := LPedidoitem.AutoIncrem;
+                         Post
+                    end;
+               end;
+          end;
      end;
      CalculaTotalPedido;
 end;
 
-procedure TFormPrincipal.DBEditCodClienteChange(Sender: TObject);
+procedure TFormPrincipal.DBEditCodClienteExit(Sender: TObject);
 begin
-     ButtonConsultarCliente.Visible := Trim(DbEditCodCliente.Text).IsEmpty;
+     ConsultarCliente(DBEditCodCliente.Text);
 end;
 
 procedure TFormPrincipal.DBEditCodigoExit(Sender: TObject);
 var lCodProduto : Integer;
-    lResult : TRetorno;
+    lResult : TRetornoProduto;
 begin
      if not(Trim(DBEditCodigo.Text).IsEmpty) then
      begin
           lCodProduto := StrToInt(DBEditCodigo.Text);
 
-          lResult := FClientAcess.BuscaProduto(lCodProduto,DBEditDescricao,
-                                               DBEditValorUnitario);
+          lResult := FClientAcess.BuscaProduto(lCodProduto);
 
-          if not(lResult.OK) then
+          with lResult do
           begin
-               ShowMessage(lResult.Mensagem);
-               DBEditDescricao.Text     := '';
-               DBEditValorUnitario.Text := '';
-               DBEditCodigo.Text        := '';
+               if not(Retorno.OK) then
+               begin
+                    ShowMessage(Retorno.Mensagem);
+                    DBEditDescricao.Text     := '';
+                    DBEditValorUnitario.Text := '';
+                    DBEditCodigo.Text        := '';
+               end
+               else
+               begin
+                    DBEditDescricao.Text     := Produto.Descricao;
+                    DBEditValorUnitario.Text := FloatToStr(Produto.PrecoVenda);
+               end;
           end;
      end;
-end;
-
-procedure TFormPrincipal.DBEditQuantidadeChange(Sender: TObject);
-begin
-     DBEditQuantidade.Text
 end;
 
 procedure TFormPrincipal.DBGridItensKeyDown(Sender: TObject; var Key: Word;
@@ -372,23 +430,13 @@ begin
                              end;
 
                              Delete;
+
+                             CalculaTotalPedido;
                         end;
                    end;
               end;
          end;
      end;
-end;
-
-procedure TFormPrincipal.EditNumeroPedidoChange(Sender: TObject);
-begin
-     ButtonConsultarPedido.Visible := Trim(EditNumeroPedido.Text).IsEmpty;
-
-     if Trim(EditNumeroPedido.Text).IsEmpty then
-     begin
-          LimpaComponentesPedido;
-     end;
-
-     CalculaTotalPedido;
 end;
 
 procedure TFormPrincipal.FormCreate(Sender: TObject);
@@ -412,10 +460,32 @@ end;
 
 procedure TFormPrincipal.GravaPedido;
 var lResult : TRetorno;
+    LPedido: IPedido;
+    LPedidoItem : IPedidoItem;
 begin
-     lResult:= FClientAcess.GravaPedido(StrToIntDef(EditNumeroPedido.Text,0),
-                                        StrToIntDef(DBEditCodCliente.Text,0),
-                                        FDMemTablePedidoItem,
+     LPedido := TPedido.Create(StrToIntDef(EditNumeroPedido.Text,0),
+                               Date,
+                               StrToIntDef(DBEditCodCliente.Text,0));
+
+     with FDMemTablePedidoItem do
+     begin
+          First;
+
+          while not(Eof) do
+          begin
+               LPedidoItem := TPedidoItem.Create(LPedido.NumeroPedido,
+                                                 FieldByName('codigo_produto').AsInteger,
+                                                 FieldByName('quantidade').AsFloat,
+                                                 FieldByName('descricao').AsString,
+                                                 FieldByName('VL_unitario').AsCurrency,
+                                                 FieldByName('auto_incremento').AsInteger);
+
+               LPedido.AdicionarItem(LPedidoItem);
+               Next;
+          end;
+     end;
+
+     lResult:= FClientAcess.GravaPedido(LPedido,
                                         FApagaItens);
 
      if not(lResult.OK) then
@@ -425,18 +495,7 @@ begin
      else
      begin
           ShowMessage('Pedido Salvo com Sucesso.');
-
-          FClientAcess.BuscaPedido(lResult.Codigo,
-                                   EditNumeroPedido,
-                                   EditDataEmissao,
-                                   DBEditCodCliente,
-                                   DBEditCliente,
-                                   LabelVLTotal,
-                                   FDMemTablePedidoItem);
-
-          EditNumeroPedido.Text := lResult.Codigo.ToString;
-
-          CalculaTotalPedido;
+          ConsultarPedido(lResult.Codigo);
      end;
 end;
 

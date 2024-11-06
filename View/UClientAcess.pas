@@ -11,20 +11,13 @@ uses
        protected
         { protected declarations }
        public
-       function BuscaProduto(ACodProduto : Integer;
-                             var AEditDescricao,AEditValorUnitario: TEdit) : TRetorno;
+       function BuscaProduto(ACodProduto : Integer) : TRetornoProduto;
 
-       function BuscaCliente(ACodCliente : Integer;
-                            AEditCodCliente, AEditNome: TEdit) : TRetorno;
+       function BuscaCliente(ACodCliente : Integer) : TRetornoCliente;
 
-       function BuscaPedido(ACodPedido: Integer;
-                            AEditNumeroPedido,
-                            AEditDataEmissao,AEditCodCliente,AEditCliente : TEdit;
-                            ALabelTotal: TLabel;
-                            AMemTablePedidoItens :TFDMemTable) : TRetorno;
+       function BuscaPedido(ACodPedido: Integer) : TRetornoPedido;
 
-       function GravaPedido(ACodPedido,ACodCliente: Integer;
-                            aMemTablePedidoItens :TFDMemTable;
+       function GravaPedido(APedido : IPedido;
                             AApagaItens : TStringList) : TRetorno;
 
        function ApagarPedido(ACodPedido : Integer) : TRetorno;
@@ -53,6 +46,13 @@ begin
         LPedidoController := TPedidoController.Create;
 
         Result.OK := LPedidoController.ApagarPedido(ACodPedido);
+
+        if not(Result.OK) then
+        begin
+             Result.Mensagem :='O Pedido '+ACodPedido.ToString+
+                               ' Não Foi Encontrado.'
+        end;
+
      except on E: Exception do
         begin
              Result.OK := False;
@@ -61,129 +61,112 @@ begin
      end
 end;
 
-function TClientAcess.BuscaCliente(ACodCliente: Integer;
-                                   AEditCodCliente, AEditNome: TEdit): TRetorno;
+function TClientAcess.BuscaCliente(ACodCliente: Integer): TRetornoCliente;
 var lClienteController : iClienteController;
-    lCliente : iCliente;
 begin
-     Result.OK := False;
-     lClienteController := TClienteController.Create;
-     try
-        lCliente := lClienteController.GetCliente(ACodCliente);
+     with Result do
+     begin
+          Retorno.OK := False;
+          lClienteController := TClienteController.Create;
+          try
+             Result.Cliente := lClienteController.GetCliente(ACodCliente);
 
-        if not Assigned(lCliente) then
-        begin
-             Result.OK := False;
-             Result.Mensagem := 'Cliente '+ACodCliente.ToString + ' não encontrado.';
-             Exit;
-        end;
+             if not Assigned(Result.Cliente) then
+             begin
+                  Retorno.OK := False;
+                  Retorno.Mensagem := 'Cliente '+ACodCliente.ToString + ' não encontrado.';
+                  Exit;
+             end;
 
-        AEditCodCliente.Text := ACodCliente.ToString;
-        AEditNome.Text := lCliente.Nome;
-
-        Result.OK      := True;
-     except on E: Exception do
-        begin
-             Result.OK := False;
-             Result.Mensagem :='Erro ao Buscar Cliente: '+E.Message;
-        end;
+             Retorno.OK := True;
+          except on E: Exception do
+             begin
+                  Retorno.OK := False;
+                  Retorno.Mensagem :='Erro ao Buscar Cliente: '+E.Message;
+             end;
+          end;
      end;
 end;
 
-function TClientAcess.BuscaPedido(ACodPedido: Integer;
-                                  AEditNumeroPedido,
-                                  AEditDataEmissao,AEditCodCliente,AEditCliente : TEdit;
-                                  ALabelTotal: TLabel;
-                                  AMemTablePedidoItens :TFDMemTable): TRetorno;
+function TClientAcess.BuscaPedido(ACodPedido: Integer): TRetornoPedido;
 var
-  LListPedidoitem : TList<IPedidoItem>;
-  LPedidoitem : IPedidoItem;
   LPedidoController : IPedidoController;
   LPedido : IPedido;
 begin
-     LPedidoController := TPedidoController.Create;
-     LPedido           := LPedidoController.GetPedido(ACodPedido);
-
-     if not Assigned(LPedido) then
+     with Result do
      begin
-          Result.Ok := False;
-          Result.Mensagem :='O Pedido '+ACodPedido.toString+' não foi encontrado.';
-          Exit;
-     end;
+          try
+             Retorno.OK := False;
+             Retorno.Mensagem :='Falha Ao Buscar Pedido. ';
 
-     AEditNumeroPedido.Text := ACodPedido.toString;
-     AEditCodCliente.Text   := LPedido.GetCodCliente.ToString;
-     AEditCliente.Text      := LPedido.GetCliente;
-     AEditDataEmissao.Text  := DateToStr(LPedido.DataEmissao);
-     ALabelTotal.Caption    := FloatToStr(LPedido.GetValorTotal);
+             LPedidoController := TPedidoController.Create;
+             LPedido           := LPedidoController.GetPedido(ACodPedido);
 
-     LListPedidoitem := LPedido.GetListaItens();
-     aMemTablePedidoItens.EmptyDataSet;
+             if not Assigned(LPedido) then
+             begin
+                  Retorno.Mensagem :='O Pedido '+ACodPedido.toString+' não foi encontrado.';
+                  Exit;
+             end;
 
-     for LPedidoitem in LListPedidoitem do
-     begin
-          with aMemTablePedidoItens do
-          begin
-               Append;
-               FieldByName('codigo_produto').AsInteger  := LPedidoitem.CodigoProduto;
-               FieldByName('descricao').AsString        := LPedidoitem.Descricao;
-               FieldByName('quantidade').AsFloat        := LPedidoitem.Quantidade;
-               FieldByName('vl_unitario').AsCurrency    := LPedidoitem.VlUnitario;
-               FieldByName('vl_total').AsCurrency       := LPedidoitem.VlTotal;
-               FieldByName('auto_incremento').AsInteger := LPedidoitem.AutoIncrem;
-               Post
+             Result.Pedido := LPedido;
+             Retorno.Ok := True;
+
+             except on E: Exception do
+             begin
+                  Retorno.OK := False;
+                  Retorno.Mensagem :='Erro Ao Buscar Pedido: '+E.Message;
+             end;
           end;
      end;
-
-     Result.Ok := True;
 end;
 
-function TClientAcess.BuscaProduto(ACodProduto : integer;
-                                   var AEditDescricao,AEditValorUnitario: TEdit): TRetorno;
+function TClientAcess.BuscaProduto(ACodProduto : integer): TRetornoProduto;
 var lProdutoController : iProdutoController;
     lProduto : iProduto;
 begin
-     Result.OK := True;
-     lProdutoController := TProdutoController.Create;
-     try
-        lProduto := lProdutoController.GetProduto(ACodProduto);
+     with Result do
+     begin
+          Retorno.OK := True;
+          lProdutoController := TProdutoController.Create;
+          try
+             lProduto := lProdutoController.GetProduto(ACodProduto);
 
-        if not Assigned(lProduto) then
-        begin
-             Result.OK := False;
-             Result.Mensagem := 'Cliente '+ACodProduto.ToString + ' não encontrado.';
-             Exit;
-        end;
+             if not Assigned(lProduto) then
+             begin
+                  Retorno.OK := False;
+                  Retorno.Mensagem := 'Cliente '+ACodProduto.ToString + ' não encontrado.';
+                  Exit;
+             end;
 
-        AEditDescricao.Text := lProduto.Descricao;
-        AEditValorUnitario.Text := FloatToStr(lProduto.PrecoVenda);
+             Retorno.OK := True;
 
-     except on E: Exception do
-        begin
-             Result.OK := False;
-             Result.Mensagem :='Erro: '+E.Message;
-        end;
+             Produto :=  lProduto;
+
+
+          except on E: Exception do
+             begin
+                  Retorno.OK := False;
+                  Retorno.Mensagem :='Erro: '+E.Message;
+             end;
+          end;
      end;
 end;
 
-function TClientAcess.GravaPedido(ACodPedido,ACodCliente: Integer;
-                                  AMemTablePedidoItens :TFDMemTable;
+function TClientAcess.GravaPedido(APedido : IPedido;
                                   AApagaItens : TStringList): TRetorno;
 var LPedidoController  : IPedidoController;
-    LPedido            : IPedido;
-    LPedidoItem        : IPedidoItem;
     lNumeroPedido      : Integer;
     I                  : Integer;
     LPedidoItensApagar : TList<IPedidoItem>;
 begin
-     if ACodCliente <= 0 then
+     if APedido.GetCodCliente <= 0 then
      begin
           Result.OK := False;
           Result.Mensagem :='Insira o Cliente Para Gravar o Pedido.';
           Exit;
      end;
 
-     if aMemTablePedidoItens.isEmpty then
+     if APedido.GetListaItens.Count = 0 then
      begin
           Result.OK := False;
           Result.Mensagem :='Insira Pelo Menos um Item Para Salva o Pedido.';
@@ -191,45 +174,28 @@ begin
      end;
 
      try
-        LPedido := TPedido.Create(ACodPedido,Date,ACodCliente);
+        LPedidoItensApagar := TList<IPedidoItem>.Create;
 
-        aMemTablePedidoItens.First;
-
-        while not(aMemTablePedidoItens.Eof) do
+        if AApagaItens.Count > 0 then
         begin
-             LPedidoItem := TPedidoItem.Create(ACodPedido,
-                                               aMemTablePedidoItens.FieldByName('codigo_produto').AsInteger,
-                                               aMemTablePedidoItens.FieldByName('quantidade').AsFloat,
-                                               aMemTablePedidoItens.FieldByName('descricao').AsString,
-                                               aMemTablePedidoItens.FieldByName('VL_unitario').AsCurrency,
-                                               aMemTablePedidoItens.FieldByName('auto_incremento').AsInteger);
+             for I := 0 to AApagaItens.Count - 1 do
+             begin
+                  LPedidoItensApagar.Add(TPedidoItem.Create(APedido.NumeroPedido,
+                                                            AApagaItens[i].ToInteger()));
+             end;
 
-             LPedido.AdicionarItem(LPedidoItem);
-             aMemTablePedidoItens.Next;
+             AApagaItens.Clear;
         end;
 
         LPedidoController := TPedidoController.Create;
-        lNumeroPedido     := LPedidoController.SalvarPedido(LPedido);
+        lNumeroPedido     := LPedidoController.SalvarPedido(APedido,
+                                                            LPedidoItensApagar);
 
         if lNumeroPedido = 0 then
         begin
              Result.OK := False;
              Result.Mensagem :='Erro ao Salvar o Pedido ';
              Exit;
-        end;
-
-        if AApagaItens.Count > 0 then
-        begin
-             LPedidoItensApagar := TList<IPedidoItem>.Create;
-             for I := 0 to AApagaItens.Count - 1 do
-             begin
-                   LPedidoItensApagar.Add(TPedidoItem.Create(ACodPedido,
-                                                             AApagaItens[i].ToInteger()));
-             end;
-
-             LPedidoController.ApagarPedidoItens(LPedidoItensApagar);
-
-             AApagaItens.Clear;
         end;
 
         Result.OK       := True;

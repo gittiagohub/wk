@@ -19,7 +19,8 @@ type
     constructor Create();
     destructor Destroy; override;
 
-    function SalvarPedido(APedido: IPedido): Integer;
+    function SalvarPedido(APedido: IPedido;
+                          AItensApagar: TList<IPedidoItem>): Integer;
 
     function ConsultarPedido(NumeroPedido: Integer): IPedido;
     function ConsultarProduto(ACodigo: Integer): IProduto;
@@ -40,7 +41,9 @@ function TPersistencia.ConsultarProduto(ACodigo: Integer): IProduto;
 var LSQl : String;
 begin
      try
-        LSQl := 'SELECT codigo, descricao, preco_venda FROM produto WHERE codigo = :Codigo';
+        LSQl := 'SELECT codigo, descricao, preco_venda '+
+                ' FROM produto WHERE codigo = :Codigo';
+
         FQuery.SQL.Text := LSQl;
         FQuery.ParamByName('Codigo').Value := ACodigo;
         FQuery.Open;
@@ -149,7 +152,7 @@ begin
         FQuery.ExecSQL;
         FConexao.Commit;
 
-        Result := True;
+        Result := FQuery.RowsAffected > 0;
      except on E: Exception do
          begin
               FConexao.RollBack;
@@ -183,14 +186,11 @@ begin
 
         FQuery.SQL.Text := LSQL;
 
-        FConexao.StartTransaction;
         FQuery.ExecSQL;
-        FConexao.Commit;
 
         Result := True;
      except on E: Exception do
            begin
-                FConexao.RollBack;
                raise Exception.Create('Erro ao Apagar Item(s) do Pedido');
            end;
      end
@@ -240,7 +240,8 @@ begin
      inherited;
 end;
 
-function TPersistencia.SalvarPedido(APedido: IPedido): integer;
+function TPersistencia.SalvarPedido(APedido: IPedido;
+                                    AItensApagar: TList<IPedidoItem>): integer;
 var
   lSQL : string;
   lListItens : TList<IPedidoItem>;
@@ -288,6 +289,10 @@ begin
              lNumeroPedido := FQuery.FieldByName('LastID').AsInteger;
         end;
 
+        if AItensApagar.Count > 0 then
+        begin
+             ApagarPedidoItens(AItensApagar);
+        end;
 
         lListItens := APedido.GetListaItens;
 

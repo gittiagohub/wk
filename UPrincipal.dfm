@@ -14,11 +14,9 @@ object FormPrincipal: TFormPrincipal
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poOwnerFormCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  PixelsPerInch = 96
   TextHeight = 13
   object PanelPrincipal: TPanel
     Left = 0
@@ -75,7 +73,7 @@ object FormPrincipal: TFormPrincipal
           Width = 149
           Height = 36
           Anchors = [akTop, akRight]
-          Caption = 'ConsultarCliente'
+          Caption = 'Consultar Cliente'
           Font.Charset = DEFAULT_CHARSET
           Font.Color = clWindowText
           Font.Height = -11
@@ -92,7 +90,7 @@ object FormPrincipal: TFormPrincipal
           Height = 21
           NumbersOnly = True
           TabOrder = 0
-          OnChange = DBEditCodClienteChange
+          OnExit = DBEditCodClienteExit
         end
         object DBEditCliente: TEdit
           Left = 180
@@ -193,6 +191,7 @@ object FormPrincipal: TFormPrincipal
           Top = 15
           Width = 654
           Height = 160
+          TabStop = False
           Align = alClient
           DataSource = DataSourcePedidoItem
           ReadOnly = True
@@ -309,7 +308,7 @@ object FormPrincipal: TFormPrincipal
           Font.Name = 'Tahoma'
           Font.Style = []
           ParentFont = False
-          TabOrder = 3
+          TabOrder = 4
           OnClick = ButtonConsultarPedidoClick
         end
         object EditNumeroPedido: TEdit
@@ -318,8 +317,8 @@ object FormPrincipal: TFormPrincipal
           Width = 133
           Height = 21
           NumbersOnly = True
-          TabOrder = 0
-          OnChange = EditNumeroPedidoChange
+          ReadOnly = True
+          TabOrder = 1
         end
         object EditDataEmissao: TEdit
           Left = 180
@@ -327,7 +326,7 @@ object FormPrincipal: TFormPrincipal
           Width = 133
           Height = 21
           ReadOnly = True
-          TabOrder = 1
+          TabOrder = 2
         end
         object ButtonApagarPedido: TButton
           Left = 362
@@ -342,8 +341,17 @@ object FormPrincipal: TFormPrincipal
           Font.Name = 'Tahoma'
           Font.Style = []
           ParentFont = False
-          TabOrder = 2
+          TabOrder = 3
           OnClick = ButtonApagarPedidoClick
+        end
+        object ButtonNovoPedido: TButton
+          Left = 65
+          Top = 12
+          Width = 87
+          Height = 17
+          Caption = 'Novo'
+          TabOrder = 0
+          OnClick = ButtonNovoPedidoClick
         end
       end
     end

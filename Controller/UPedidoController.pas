@@ -18,7 +18,8 @@ type
     destructor Destroy; override;
 
     function GetPedido(ACodigo: Integer): IPedido;
-    function SalvarPedido(APedido: IPedido): Integer;
+    function SalvarPedido(APedido: IPedido;
+                          APedidoItens: TList<IPedidoItem>): Integer;
     function ApagarPedidoItens(APedidoItens: TList<IPedidoItem>): Boolean;
     function ApagarPedido(ACodigo: Integer): Boolean;
   end;
@@ -75,14 +76,15 @@ begin
      Result :=  FPersistencia.ConsultarPedido(ACodigo);
 end;
 
-function TPedidoController.SalvarPedido(APedido: IPedido): Integer;
+function TPedidoController.SalvarPedido(APedido: IPedido;
+                                        APedidoItens: TList<IPedidoItem>): Integer;
 begin
      if ((APedido.DataEmissao = 0) or 
          (APedido.GetCodCliente <= 0)) then
      begin    
           Result := -1;
      end;
-     Result :=  FPersistencia.SalvarPedido(APedido);
+     Result :=  FPersistencia.SalvarPedido(APedido,APedidoItens);
 end;
 
 end.
